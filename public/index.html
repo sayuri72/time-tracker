@@ -287,7 +287,8 @@
       const email = document.getElementById('email').value.trim();
       if(!email){ alert('メールアドレスを入力してください'); return; }
       document.getElementById('loginStatus').textContent = '送信中…';
-      const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: REDIRECT_TO } });
+      // const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: REDIRECT_TO } });
+      const { error } = await supabase.auth.signInWithOtp({ email });
       document.getElementById('loginStatus').textContent = error ? ('送信失敗: '+ error.message) : '送信しました！メールのリンクを開いてください';
     });
 
@@ -326,16 +327,6 @@
         try{ history.replaceState(null, '', location.origin + location.pathname); }catch(_){}
       }
     })();
-        loginCard.classList.add('hidden');
-        tabs.classList.remove('hidden');
-        document.querySelectorAll('#tab-input, #historyCard, #tab-summary, #tab-clients, #tab-settings').forEach(s=>s.classList.remove('hidden'));
-        await bootAfterLogin();
-        // 認証後はURLハッシュをクリーンに（#access_token 等を除去）
-        try{ history.replaceState(null, '', location.origin + location.pathname); }catch(_){}
-      }else{
-        loginCard.classList.remove('hidden');
-      }
-    });
 
     // ====== 4) タブ切り替え ======
     document.querySelectorAll('.tab').forEach(t=>{
