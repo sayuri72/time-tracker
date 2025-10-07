@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Login付きタイムトラッカー（Supabase）</title>
+  <style>
+    :root{--bg:#0f1115;--card:#161a22;--muted:#8b95a7;--text:#e6e8ee;--accent:#6ee7b7;--danger:#ef4444;--line:#242a36}
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;line-height:1.5;background:var(--bg);color:var(--text)}
+    header{position:sticky;top:0;background:rgba(15,17,21,.8);backdrop-filter:saturate(180%) blur(10px);border-bottom:1px solid var(--line);z-index:10}
+    .wrap{max-width:980px;margin:0 auto;padding:16px}
+    h1{margin:0;font-size:20px}
+    .tabs{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap}
+    .tab{padding:8px 12px;border:1px solid var(--line);border-radius:10px;cursor:pointer;color:var(--muted)}
+    .tab.active{background:var(--card);color:var(--text);border-color:#2b3242}
+    main{padding:16px}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin:12px 0}
+    .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+    .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+    label{font-size:12px;color:var(--muted)}
+    input,select,textarea{width:100%;padding:10px;border-radius:10px;border:1px solid var(--line);background:#0c0f14;color:var(--text)}
+    input[type="month"],input[type="date"],input[type="time"]{color-scheme:dark}
+    button{padding:10px 14px;border-radius:10px;border:1px solid #2b3242;background:#1a2233;color:var(--text);cursor:pointer}
+    button.primary{background:#123026;border-color:#1b4d3d;color:#c9ffe6}
+    button.ghost{background:transparent;border-color:var(--line);color:var(--muted)}
+    button.danger{background:#2a0d12;border-color:#5a1b21;color:#ffd7dc}
+    table{width:100%;border-collapse:collapse}
+    th,td{border-bottom:1px solid var(--line);padding:10px;text-align:left}
+    th{color:#aab2c4;font-weight:600}
+    .right{text-align:right}
+    .muted{color:var(--muted)}
+    .flex{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+    .spacer{flex:1}
+    .badge{display:inline-block;padding:2px 8px;border-radius:999px;background:#1e2431;border:1px solid #2b3242;color:#c8d0e0;font-size:12px}
+    .hint{font-size:12px;color:var(--muted)}
+    .hidden{display:none}
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.47.6/dist/umd/supabase.min.js"></script>
+</head>
+<body>
+  <header>
+    <div class="wrap">
+      <div class="flex">
+        <h1>タイムトラッカー（Supabase同期）</h1>
+        <span class="spacer"></span>
+        <div id="authBox" class="flex">
+          <span id="userEmail" class="muted"></span>
+          <button id="signOut" class="ghost hidden">Sign out</button>
+        </div>
+      </div>
+      <div class="tabs hidden" id="tabs">
+        <div class="tab active" data-tab="input">入力</div>
+        <div class="tab" data-tab="summary">月次サマリ</div>
+        <div class="tab" data-tab="clients">クライアント</div>
+        <div class="tab" data-tab="settings">設定</div>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <!-- ログインカード -->
+    <section id="loginCard" class="card">
+      <h2 style="margin-top:0">ログイン</h2>
+      <p class="muted">メールアドレスにMagic Linkを送ります。開いた端末（PC/スマホ）で同じデータにアクセスできます。</p>
+      <div class="row">
+        <div>
+          <label>メールアドレス</label>
+          <input id="email" type="email" placeholder="you@example.com" />
+        </div>
+        <div class="flex" style="align-items:end">
+          <button class="primary" id="sendLink">Magic Link送信</button>
+          <span id="loginStatus" class="hint"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 入力タブ -->
+    <section id="tab-input" class="card hidden">
+      <h2 style="margin-top:0">稼働の入力</h2>
+      <div class="row">
+        <div>
+          <label>日付</label>
+          <input id="date" type="date" />
+        </div>
+        <div>
+          <label>クライアント</label>
+          <select id="client"></select>
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>開始</label>
+          <input id="start" type="time" />
+        </div>
+        <div>
+          <label>終了</label>
+          <input id="end" type="time" />
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>休憩（分）</label>
+          <input id="break" type="number" min="0" value="0" />
+        </div>
+        <div>
+          <label>合計分（直接入力・任意）</label>
+          <input id="minutes" type="number" min="0" placeholder="開始/終了から自動計算" />
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>メモ（任意）</label>
+          <input id="note" type="text" placeholder="例）打合せ、資料作成など" />
+        </div>
+        <div class="flex" style="margin-top:22px">
+          <button class="primary" id="saveEntry">保存</button>
+          <button class="ghost" id="startNow">今すぐ開始</button>
+          <button class="ghost" id="endNow">今すぐ終了</button>
+          <span class="spacer"></span>
+          <span class="hint" id="calcPreview">合計 0.0h / ¥0</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- 履歴 -->
+    <section class="card hidden" id="historyCard">
+      <div class="flex"><h3 style="margin:0">最近の履歴</h3><span class="spacer"></span>
+        <button class="ghost" id="refresh">更新</button>
+      </div>
+      <div class="hint">直近30件を表示</div>
+      <div style="overflow:auto">
+        <table id="historyTable">
+          <thead>
+            <tr>
+              <th>日付</th><th>クライアント</th><th class="right">時間</th><th class="right">金額</th><th>メモ</th><th></th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 月次サマリ -->
+    <section id="tab-summary" class="card hidden">
+      <h2 style="margin-top:0">月次サマリ</h2>
+      <div class="row">
+        <div>
+          <label>対象月</label>
+          <input type="month" id="monthPicker" />
+        </div>
+        <div class="flex" style="align-items:end">
+          <button id="recalc">再計算</button>
+          <span class="spacer"></span>
+          <span class="badge" id="closingInfo">締日: 月末 / 丸め: 15分</span>
+        </div>
+      </div>
+      <div class="card" style="margin:12px 0">
+        <div class="row3">
+          <div>
+            <div class="muted">合計時間</div>
+            <div id="sumHours" style="font-size:24px">0.0 h</div>
+          </div>
+          <div>
+            <div class="muted">合計金額</div>
+            <div id="sumAmount" style="font-size:24px">¥0</div>
+          </div>
+          <div>
+            <div class="muted">エントリ数</div>
+            <div id="sumCount" style="font-size:24px">0</div>
+          </div>
+        </div>
+      </div>
+      <h3>クライアント別</h3>
+      <div style="overflow:auto">
+        <table id="byClient">
+          <thead><tr><th>クライアント</th><th class="right">時間</th><th class="right">単価</th><th class="right">金額</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- クライアント管理 -->
+    <section id="tab-clients" class="card hidden">
+      <h2 style="margin-top:0">クライアント</h2>
+      <div class="row">
+        <div>
+          <label>名称</label>
+          <input id="clientName" type="text" placeholder="例）A社" />
+        </div>
+        <div>
+          <label>時給（円）</label>
+          <input id="clientRate" type="number" min="0" value="3000" />
+        </div>
+      </div>
+      <div class="row">
+        <div>
+          <label>メモ（任意）</label>
+          <input id="clientMemo" type="text" />
+        </div>
+        <div class="flex" style="align-items:end">
+          <button class="primary" id="addClient">追加</button>
+        </div>
+      </div>
+      <div style="overflow:auto;margin-top:12px">
+        <table id="clientsTable">
+          <thead><tr><th>名称</th><th class="right">時給</th><th>メモ</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 設定 -->
+    <section id="tab-settings" class="card hidden">
+      <h2 style="margin-top:0">設定</h2>
+      <div class="row">
+        <div>
+          <label>端数丸め（分）</label>
+          <select id="rounding">
+            <option value="1">1</option>
+            <option value="5">5</option>
+            <option value="10">10</option>
+            <option value="15" selected>15</option>
+            <option value="30">30</option>
+          </select>
+        </div>
+        <div>
+          <label>締日</label>
+          <select id="closingDay">
+            <option value="EOM">月末締め</option>
+            <option value="15">毎月15日締め</option>
+          </select>
+        </div>
+      </div>
+      <p class="hint">※ 設定は端末ごとにlocalStorage保存（必要なら後でテーブル化できます）</p>
+    </section>
+  </main>
+
+  <script>
+    // ====== 1) Supabase 初期化 ======
+    const SUPABASE_URL = 'https://jsybriyheohiztlilihy.supabase.co'; // 例: https://xxxx.supabase.co
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpzeWJyaXloZW9oaXp0bGlsaWh5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk3NjYwMDAsImV4cCI6MjA3NTM0MjAwMH0.6-lHXtoSAbihIOix1ORHUeIpptF6bVmvne1DP94dZmU';
+    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+      },
+    });
+
+    // Magic Link の固定リダイレクト先（本番のNetlify URLに置き換え）
+    const REDIRECT_TO = 'https://soft-jalebi-751393.netlify.app/';
+
+    // === エラーハッシュの表示（原因をユーザーに見せる） ===
+    (function(){
+      try{
+        if(location.hash && location.hash.includes('error_code=')){
+          const params = new URLSearchParams(location.hash.slice(1)); // '#'除去
+          const code = params.get('error_code');
+          const descRaw = params.get('error_description') || '';
+          const desc = decodeURIComponent(descRaw);
+          const ls = document.getElementById('loginStatus');
+          if(ls){ ls.textContent = `エラー: ${code} – ${desc}`; }
+        }
+      }catch(e){ /* no-op */ }
+    })();
+
+    // ====== 2) 共通ユーティリティ ======
+    const fmtJPY = (n)=> '¥' + (Math.round(n)).toLocaleString('ja-JP');
+    const pad=(n)=> n.toString().padStart(2,'0');
+    const toMinutes = (time)=>{ if(!time) return null; const [h,m]=time.split(':').map(Number); return h*60+m; };
+    const monthStr=(d)=> `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+
+    const settings = { // localStorage に保存（端末別）
+      load(){ try{ return JSON.parse(localStorage.getItem('settings_v1'))||{rounding:15,closingDay:'EOM'} }catch{ return {rounding:15,closingDay:'EOM'} } },
+      save(v){ localStorage.setItem('settings_v1', JSON.stringify(v)); }
+    };
+    let cfg = settings.load();
+
+    // ====== 3) 認証UI ======
+    const loginCard = document.getElementById('loginCard');
+    const tabs = document.getElementById('tabs');
+    const userEmail = document.getElementById('userEmail');
+    const signOutBtn = document.getElementById('signOut');
+
+    document.getElementById('sendLink').addEventListener('click', async()=>{
+      const email = document.getElementById('email').value.trim();
+      if(!email){ alert('メールアドレスを入力してください'); return; }
+      document.getElementById('loginStatus').textContent = '送信中…';
+      const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: REDIRECT_TO } });
+      document.getElementById('loginStatus').textContent = error ? ('送信失敗: '+ error.message) : '送信しました！メールのリンクを開いてください';
+    });
+
+    signOutBtn.addEventListener('click', async()=>{
+      await supabase.auth.signOut();
+      location.reload();
+    });
+
+    // セッション監視
+    supabase.auth.onAuthStateChange(async (_event, session)=>{
+      if(session?.user){
+        userEmail.textContent = session.user.email;
+        signOutBtn.classList.remove('hidden');
+        loginCard.classList.add('hidden');
+        tabs.classList.remove('hidden');
+        document.querySelectorAll('#tab-input, #historyCard, #tab-summary, #tab-clients, #tab-settings').forEach(s=>s.classList.remove('hidden'));
+        await bootAfterLogin();
+        // 認証後はURLハッシュをクリーンに（#access_token 等を除去）
+        try{ history.replaceState(null, '', location.origin + location.pathname); }catch(_){}
+      }else{
+        loginCard.classList.remove('hidden');
+      }
+    });
+
+    // ✅ 2回目以降の自動復帰（ページロード直後に既存セッションを読み込み）
+    (async ()=>{
+      const { data: { session } } = await supabase.auth.getSession();
+      if(session?.user){
+        userEmail.textContent = session.user.email;
+        signOutBtn.classList.remove('hidden');
+        loginCard.classList.add('hidden');
+        tabs.classList.remove('hidden');
+        document.querySelectorAll('#tab-input, #historyCard, #tab-summary, #tab-clients, #tab-settings').forEach(s=>s.classList.remove('hidden'));
+        await bootAfterLogin();
+        // 認証後はURLハッシュをクリーンに（#access_token 等を除去）
+        try{ history.replaceState(null, '', location.origin + location.pathname); }catch(_){}
+      }
+    })();
+        loginCard.classList.add('hidden');
+        tabs.classList.remove('hidden');
+        document.querySelectorAll('#tab-input, #historyCard, #tab-summary, #tab-clients, #tab-settings').forEach(s=>s.classList.remove('hidden'));
+        await bootAfterLogin();
+        // 認証後はURLハッシュをクリーンに（#access_token 等を除去）
+        try{ history.replaceState(null, '', location.origin + location.pathname); }catch(_){}
+      }else{
+        loginCard.classList.remove('hidden');
+      }
+    });
+
+    // ====== 4) タブ切り替え ======
+    document.querySelectorAll('.tab').forEach(t=>{
+      t.addEventListener('click',()=>{
+        document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+        t.classList.add('active');
+        const tab = t.dataset.tab;
+        document.querySelectorAll('section[id^="tab-"]').forEach(s=>s.classList.add('hidden'));
+        document.getElementById(`tab-${tab}`).classList.remove('hidden');
+      })
+    })
+
+    // ====== 5) アプリ本体 ======
+    const roundingEl=document.getElementById('rounding');
+    const closingEl=document.getElementById('closingDay');
+    roundingEl.value = cfg.rounding; closingEl.value = cfg.closingDay;
+    roundingEl.addEventListener('change', ()=>{ cfg.rounding=Number(roundingEl.value); settings.save(cfg); preview(); renderSummary(); });
+    closingEl.addEventListener('change', ()=>{ cfg.closingDay=closingEl.value; settings.save(cfg); renderSummary(); });
+
+    document.getElementById('date').valueAsDate = new Date();
+    document.getElementById('monthPicker').value = monthStr(new Date());
+
+    let currentUser = null; // セッション後に設定
+    let cachedClients = [];
+    let cachedEntries = [];
+
+    async function bootAfterLogin(){
+      const { data: { user } } = await supabase.auth.getUser();
+      currentUser = user;
+      await Promise.all([fetchClients(), fetchEntries()]);
+      renderClients();
+      renderHistory();
+      renderSummary();
+      preview();
+    }
+
+    // ---- DBアクセス層 ----
+    async function fetchClients(){
+      const { data, error } = await supabase.from('clients').select('*').order('created_at', { ascending: false });
+      if(error){ alert('クライアント取得失敗: '+error.message); return; }
+      cachedClients = data || [];
+    }
+    async function addClient(){
+      const name=document.getElementById('clientName').value.trim();
+      const rate=Number(document.getElementById('clientRate').value||0);
+      const memo=document.getElementById('clientMemo').value.trim();
+      if(!name||rate<=0){ alert('名称と時給を入力してください'); return; }
+      const { error } = await supabase.from('clients').insert({ user_id: currentUser.id, name, rate, memo });
+      if(error){ alert('追加失敗: '+error.message); return; }
+      document.getElementById('clientName').value='';
+      document.getElementById('clientMemo').value='';
+      await fetchClients(); renderClients();
+    }
+    async function deleteClient(id){
+      if(!confirm('削除しますか？（紐づく履歴がある場合は削除できません）')) return;
+      const { error } = await supabase.from('clients').delete().eq('id', id);
+      if(error){ alert('削除失敗: '+error.message); return; }
+      await fetchClients(); renderClients(); renderHistory(); renderSummary();
+    }
+
+    async function fetchEntries(){
+      const { data, error } = await supabase
+        .from('time_entries')
+        .select('*, clients(name, rate)')
+        .order('date', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(2000);
+      if(error){ alert('履歴取得失敗: '+error.message); return; }
+      cachedEntries = data || [];
+    }
+    async function insertEntry(payload){
+      const { error } = await supabase.from('time_entries').insert(payload);
+      if(error){ alert('保存失敗: '+error.message); return; }
+      await fetchEntries(); renderHistory(); renderSummary();
+    }
+    async function deleteEntry(id){
+      if(!confirm('削除しますか？')) return;
+      const { error } = await supabase.from('time_entries').delete().eq('id', id);
+      if(error){ alert('削除失敗: '+error.message); return; }
+      await fetchEntries(); renderHistory(); renderSummary();
+    }
+
+    // ---- UIレンダリング ----
+    function renderClients(){
+      const sel=document.getElementById('client');
+      sel.innerHTML='';
+      cachedClients.forEach(c=>{
+        const opt=document.createElement('option');
+        opt.value=c.id; opt.textContent=`${c.name}（¥${c.rate}/h）`;
+        sel.appendChild(opt);
+      });
+      const tbody=document.querySelector('#clientsTable tbody');
+      tbody.innerHTML='';
+      cachedClients.forEach(c=>{
+        const tr=document.createElement('tr');
+        tr.innerHTML = `<td>${c.name}</td><td class="right">${fmtJPY(c.rate)}</td><td>${c.memo||''}</td>
+          <td class="right"><button class="danger" data-del-client="${c.id}">削除</button></td>`;
+        tbody.appendChild(tr);
+      })
+    }
+
+    function preview(){
+      const start=toMinutes(document.getElementById('start').value);
+      const end=toMinutes(document.getElementById('end').value);
+      const manual=Number(document.getElementById('minutes').value||0);
+      const br=Number(document.getElementById('break').value||0);
+      let mins=manual>0? manual : (start!=null&&end!=null? Math.max(0,(end-start)-br):0);
+      const step = Number(cfg.rounding||15);
+      mins = Math.round(mins/step)*step; // 四捨五入
+      const c=cachedClients.find(x=>x.id===document.getElementById('client').value);
+      const amount = c? (mins/60)*Number(c.rate||0) : 0;
+      document.getElementById('calcPreview').textContent = `合計 ${(mins/60).toFixed(1)}h / ${fmtJPY(amount)}`;
+      return {mins, amount};
+    }
+
+    ['start','end','minutes','break','client'].forEach(id=>{
+      document.getElementById(id)?.addEventListener('input', preview);
+    })
+
+    async function saveEntry(){
+      if(cachedClients.length===0){ alert('先にクライアントを追加してください'); return; }
+      const date=document.getElementById('date').value;
+      const clientId=document.getElementById('client').value;
+      const start=document.getElementById('start').value;
+      const end=document.getElementById('end').value;
+      const note=document.getElementById('note').value.trim();
+      const br=Number(document.getElementById('break').value||0);
+      const manual=Number(document.getElementById('minutes').value||0);
+      const {mins}=preview();
+      if(!date || !clientId || mins<=0){ alert('日付・クライアント・時間を確認してください'); return; }
+      await insertEntry({ user_id: currentUser.id, date, client_id: clientId, start_at: start||null, end_at: end||null, break_minutes: br, minutes: mins, note });
+      // クリア
+      document.getElementById('start').value='';
+      document.getElementById('end').value='';
+      document.getElementById('minutes').value='';
+      document.getElementById('break').value='0';
+      document.getElementById('note').value='';
+      preview();
+    }
+
+    document.getElementById('saveEntry').addEventListener('click', saveEntry);
+    document.getElementById('startNow').addEventListener('click',()=>{
+      const d=new Date();
+      document.getElementById('date').valueAsDate = d;
+      document.getElementById('start').value = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      preview();
+    })
+    document.getElementById('endNow').addEventListener('click',()=>{
+      const d=new Date();
+      document.getElementById('end').value = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      preview();
+    })
+
+    document.getElementById('clientsTable').addEventListener('click', (e)=>{
+      const id=e.target.getAttribute('data-del-client');
+      if(id){ deleteClient(id); }
+    })
+    document.getElementById('addClient').addEventListener('click', addClient);
+
+    document.getElementById('historyTable').addEventListener('click',(e)=>{
+      const id=e.target.getAttribute('data-del-entry');
+      if(id){ deleteEntry(id); }
+    })
+    document.getElementById('refresh').addEventListener('click', async()=>{ await fetchEntries(); renderHistory(); renderSummary(); });
+
+    function renderHistory(){
+      const tbody=document.querySelector('#historyTable tbody');
+      tbody.innerHTML='';
+      // entries と clients を結合（fetchEntriesでselectに含めているが安全のため）
+      const rows = cachedEntries.map(e=>({
+        ...e,
+        clientName: e.clients?.name || (cachedClients.find(c=>c.id===e.client_id)?.name)||'(不明)',
+        clientRate: e.clients?.rate || (cachedClients.find(c=>c.id===e.client_id)?.rate)||0
+      }));
+      rows.slice(0,30).forEach(e=>{
+        const amt = (e.minutes/60)*Number(e.clientRate||0);
+        const tr=document.createElement('tr');
+        tr.innerHTML = `<td>${e.date}</td><td>${e.clientName}</td><td class="right">${(e.minutes/60).toFixed(2)} h</td><td class="right">${fmtJPY(amt)}</td><td>${e.note||''}</td><td class="right"><button class="ghost" data-del-entry="${e.id}">削除</button></td>`;
+        tbody.appendChild(tr);
+      })
+    }
+
+    function calcPeriod(){
+      const m = document.getElementById('monthPicker').value; // YYYY-MM
+      const [y,mo] = m.split('-').map(Number);
+      let from = new Date(y, mo-1, 1);
+      let to = new Date(y, mo, 1); // 次月1日
+      if(cfg.closingDay==='15'){
+        from = new Date(y, mo-1, 16);
+        to = new Date(y, mo, 16);
+      }
+      const rows = cachedEntries.filter(e=>{
+        const d=new Date(e.date+'T00:00:00');
+        return d>=from && d<to;
+      }).map(e=>({
+        ...e,
+        clientName: e.clients?.name || (cachedClients.find(c=>c.id===e.client_id)?.name)||'(不明)',
+        clientRate: e.clients?.rate || (cachedClients.find(c=>c.id===e.client_id)?.rate)||0
+      }));
+      const byClient = {};
+      let totalMin=0;
+      rows.forEach(e=>{
+        totalMin+=e.minutes;
+        const id = e.client_id;
+        byClient[id] = byClient[id]||{name:e.clientName, rate:e.clientRate, minutes:0};
+        byClient[id].minutes += e.minutes;
+      })
+      return {rows, byClient, totalMin};
+    }
+
+    function renderSummary(){
+      const {byClient, totalMin, rows} = calcPeriod();
+      document.getElementById('closingInfo').textContent = `締日: ${cfg.closingDay==='EOM'?'月末':'15日'} / 丸め: ${cfg.rounding}分`;
+      document.getElementById('sumHours').textContent = `${(totalMin/60).toFixed(1)} h`;
+      let totalAmt=0;
+      const tbody=document.querySelector('#byClient tbody');
+      tbody.innerHTML='';
+      Object.values(byClient).forEach(r=>{
+        const amt=(r.minutes/60)*Number(r.rate||0); totalAmt+=amt;
+        const tr=document.createElement('tr');
+        tr.innerHTML = `<td>${r.name}</td><td class="right">${(r.minutes/60).toFixed(2)} h</td><td class="right">${fmtJPY(r.rate)}</td><td class="right">${fmtJPY(amt)}</td>`;
+        tbody.appendChild(tr);
+      })
+      document.getElementById('sumAmount').textContent = fmtJPY(totalAmt);
+      document.getElementById('sumCount').textContent = rows.length;
+    }
+
+    document.getElementById('recalc').addEventListener('click', renderSummary);
+    document.getElementById('monthPicker').addEventListener('change', renderSummary);
+  </script>
+</body>
+</html>
