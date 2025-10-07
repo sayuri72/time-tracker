@@ -35,6 +35,37 @@
     .badge{display:inline-block;padding:2px 8px;border-radius:999px;background:#1e2431;border:1px solid #2b3242;color:#c8d0e0;font-size:12px}
     .hint{font-size:12px;color:var(--muted)}
     .hidden{display:none}
+
+    /* ===== 履歴テーブルのモバイル最適化 ===== */
+#historyTable { table-layout: fixed; }           /* 幅計算を安定させる */
+#historyTable th, #historyTable td { word-break: keep-all; } /* 日本語の文字ごとの折返しを防ぐ */
+
+@media (max-width: 480px){
+  .wrap{ padding:12px; }
+  .card{ padding:12px; }
+  #historyTable th, #historyTable td{
+    padding:8px 6px;
+    font-size:14px;
+    line-height:1.2;
+    white-space:nowrap;          /* 1行に収める */
+    overflow:hidden;
+    text-overflow:ellipsis;      /* はみ出しは…で省略 */
+  }
+  /* 列幅の目安（好みに合わせて微調整OK） */
+  #historyTable th:nth-child(1), #historyTable td:nth-child(1){ width:96px; }   /* 日付 */
+  #historyTable th:nth-child(3), #historyTable td:nth-child(3){ width:72px; }   /* 時間 */
+  #historyTable th:nth-child(4), #historyTable td:nth-child(4){ width:88px; }   /* 金額 */
+  #historyTable th:nth-child(6), #historyTable td:nth-child(6){ width:56px; }   /* ボタン */
+
+  /* メモは1行だけ表示（省略記号） */
+  #historyTable td.memo{
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    max-width:160px;             /* 端末幅に合わせて調整可 */
+  }
+}
+
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.47.6/dist/umd/supabase.min.js"></script>
 </head>
@@ -504,7 +535,8 @@
       rows.slice(0,30).forEach(e=>{
         const amt = (e.minutes/60)*Number(e.clientRate||0);
         const tr=document.createElement('tr');
-        tr.innerHTML = `<td>${e.date}</td><td>${e.clientName}</td><td class="right">${(e.minutes/60).toFixed(2)} h</td><td class="right">${fmtJPY(amt)}</td><td>${e.note||''}</td><td class="right"><button class="ghost" data-del-entry="${e.id}">削除</button></td>`;
+        // tr.innerHTML = `<td>${e.date}</td><td>${e.clientName}</td><td class="right">${(e.minutes/60).toFixed(2)} h</td><td class="right">${fmtJPY(amt)}</td><td>${e.note||''}</td><td class="right"><button class="ghost" data-del-entry="${e.id}">削除</button></td>`;
+        tr.innerHTML = `<td>${e.date}</td><td>${e.clientName}</td><td class="right">${(e.minutes/60).toFixed(2)}h</td><td class="right">${fmtJPY(amt)}</td><td class="memo">${e.note||''}</td><td class="right"><button class="ghost" data-del-entry="${e.id}">削除</button></td>`;
         tbody.appendChild(tr);
       })
     }
