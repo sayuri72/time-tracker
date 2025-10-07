@@ -328,36 +328,94 @@
       location.reload();
     });
 
+    // ★ 追加：バックアップキー
+    const BK_KEY = 'tt_backup_session_v1';
+
     // セッション監視
-    supabase.auth.onAuthStateChange(async (_event, session)=>{
-      if(session?.user){
-        userEmail.textContent = session.user.email;
-        signOutBtn.classList.remove('hidden');
-        loginCard.classList.add('hidden');
-        tabs.classList.remove('hidden');
-        document.querySelectorAll('#tab-input, #historyCard, #tab-summary, #tab-clients, #tab-settings').forEach(s=>s.classList.remove('hidden'));
-        await bootAfterLogin();
-        // 認証後はURLハッシュをクリーンに（#access_token 等を除去）
-        try{ history.replaceState(null, '', location.origin + location.pathname); }catch(_){}
-      }else{
-        loginCard.classList.remove('hidden');
-      }
-    });
+    // supabase.auth.onAuthStateChange(async (_event, session)=>{
+    //   if(session?.user){
+    //     userEmail.textContent = session.user.email;
+    //     signOutBtn.classList.remove('hidden');
+    //     loginCard.classList.add('hidden');
+    //     tabs.classList.remove('hidden');
+    //     document.querySelectorAll('#tab-input, #historyCard, #tab-summary, #tab-clients, #tab-settings').forEach(s=>s.classList.remove('hidden'));
+    //     await bootAfterLogin();
+    //     // 認証後はURLハッシュをクリーンに（#access_token 等を除去）
+    //     try{ history.replaceState(null, '', location.origin + location.pathname); }catch(_){}
+    //   }else{
+    //     loginCard.classList.remove('hidden');
+    //   }
+    // });
+    supabase.auth.onAuthStateChange(async (event, session) => {
+  if (session?.access_token && session?.refresh_token) {
+    // 1) いつでもバックアップ保存（リロード対策）
+    localStorage.setItem(BK_KEY, JSON.stringify({
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+    }));
+  }
+
+  if (session?.user) {
+    // 既存のUI表示処理…
+    userEmail.textContent = session.user.email;
+    signOutBtn.classList.remove('hidden');
+    loginCard.classList.add('hidden');
+    tabs.classList.remove('hidden');
+    document.querySelectorAll('#tab-input, #historyCard, #tab-summary, #tab-clients, #tab-settings').forEach(s=>s.classList.remove('hidden'));
+    await bootAfterLogin();
+    try { history.replaceState(null, '', location.origin + location.pathname); } catch(_) {}
+  } else {
+    loginCard.classList.remove('hidden');
+  }
+});
 
     // ✅ 2回目以降の自動復帰（ページロード直後に既存セッションを読み込み）
-    (async ()=>{
-      const { data: { session } } = await supabase.auth.getSession();
-      if(session?.user){
-        userEmail.textContent = session.user.email;
-        signOutBtn.classList.remove('hidden');
-        loginCard.classList.add('hidden');
-        tabs.classList.remove('hidden');
-        document.querySelectorAll('#tab-input, #historyCard, #tab-summary, #tab-clients, #tab-settings').forEach(s=>s.classList.remove('hidden'));
-        await bootAfterLogin();
-        // 認証後はURLハッシュをクリーンに（#access_token 等を除去）
-        try{ history.replaceState(null, '', location.origin + location.pathname); }catch(_){}
-      }
-    })();
+    // (async ()=>{
+    //   const { data: { session } } = await supabase.auth.getSession();
+    //   if(session?.user){
+    //     userEmail.textContent = session.user.email;
+    //     signOutBtn.classList.remove('hidden');
+    //     loginCard.classList.add('hidden');
+    //     tabs.classList.remove('hidden');
+    //     document.querySelectorAll('#tab-input, #historyCard, #tab-summary, #tab-clients, #tab-settings').forEach(s=>s.classList.remove('hidden'));
+    //     await bootAfterLogin();
+    //     // 認証後はURLハッシュをクリーンに（#access_token 等を除去）
+    //     try{ history.replaceState(null, '', location.origin + location.pathname); }catch(_){}
+    //   }
+    // })();
+
+    (async () => {
+  // 2) まず通常のセッション取得
+  let { data: { session } } = await supabase.auth.getSession();
+
+  // 3) だめならバックアップから復帰を試す
+  if (!session) {
+    const raw = localStorage.getItem(BK_KEY);
+    if (raw) {
+      try {
+        const bk = JSON.parse(raw);
+        const { data, error } = await supabase.auth.setSession({
+          access_token: bk.access_token,
+          refresh_token: bk.refresh_token,
+        });
+        if (!error) session = data.session;
+      } catch {}
+    }
+  }
+
+  // 4) 復帰できたらUIをログイン状態に
+  if (session?.user) {
+    userEmail.textContent = session.user.email;
+    signOutBtn.classList.remove('hidden');
+    loginCard.classList.add('hidden');
+    tabs.classList.remove('hidden');
+    document.querySelectorAll('#tab-input, #historyCard, #tab-summary, #tab-clients, #tab-settings').forEach(s=>s.classList.remove('hidden'));
+    await bootAfterLogin();
+    try { history.replaceState(null, '', location.origin + location.pathname); } catch(_) {}
+  }
+})();
+
+
 
     // ====== 4) タブ切り替え ======
     document.querySelectorAll('.tab').forEach(t=>{
