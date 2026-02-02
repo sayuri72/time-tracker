@@ -4,16 +4,21 @@
 const fs = require('fs');
 const path = require('path');
 
-const supabaseUrl = process.env.SUPABASE_URL || 'YOUR_SUPABASE_URL';
-const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || 'YOUR_SUPABASE_ANON_KEY';
+const supabaseUrl = process.env.SUPABASE_URL || '';
+const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || '';
 
-const configContent = `// Supabase設定ファイル（自動生成）
-// このファイルはNetlifyのビルド時に自動生成されます
-// ローカル開発時は手動で編集してください
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.error('❌ エラー: Netlifyの環境変数 SUPABASE_URL と SUPABASE_ANON_KEY を設定してください。');
+  console.error('   Site settings → Environment variables で追加し、再デプロイしてください。');
+  process.exit(1);
+}
 
+// シングルクォートをエスケープ（URL・キーに含まれる場合に備える）
+const escapeForJs = (s) => String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+const configContent = `// Supabase設定ファイル（Netlifyビルド時に自動生成）
 window.SUPABASE_CONFIG = {
-  url: '${supabaseUrl}',
-  anonKey: '${supabaseAnonKey}'
+  url: '${escapeForJs(supabaseUrl)}',
+  anonKey: '${escapeForJs(supabaseAnonKey)}'
 };
 `;
 

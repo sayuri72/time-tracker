@@ -5,40 +5,66 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Login付きタイムトラッカー（Supabase）</title>
   <style>
-    :root{--bg:#0f1115;--card:#161a22;--muted:#8b95a7;--text:#e6e8ee;--accent:#6ee7b7;--danger:#ef4444;--line:#242a36}
+    /* 明るいテーマ */
+    :root{
+      --bg:#f5f6f8;
+      --card:#fff;
+      --muted:#6b7280;
+      --text:#1f2937;
+      --accent:#059669;
+      --danger:#dc2626;
+      --line:#e5e7eb;
+      --input-bg:#fff;
+      --btn-bg:#f3f4f6;
+      --btn-border:#d1d5db;
+      --primary-bg:#047857;
+      --primary-border:#065f46;
+      --primary-text:#ecfdf5;
+      --danger-bg:#fef2f2;
+      --danger-border:#fecaca;
+      --danger-text:#991b1b;
+    }
     *{box-sizing:border-box}
     body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;line-height:1.5;background:var(--bg);color:var(--text)}
-    header{position:sticky;top:0;background:rgba(15,17,21,.8);backdrop-filter:saturate(180%) blur(10px);border-bottom:1px solid var(--line);z-index:10}
+    header{position:sticky;top:0;background:rgba(255,255,255,.9);backdrop-filter:saturate(180%) blur(10px);border-bottom:1px solid var(--line);z-index:10}
     .wrap{max-width:980px;margin:0 auto;padding:16px}
     h1{margin:0;font-size:20px}
     .tabs{display:flex;gap:6px;margin-top:12px;flex-wrap:wrap}
     .tab{padding:8px 12px;border:1px solid var(--line);border-radius:10px;cursor:pointer;color:var(--muted)}
-    .tab.active{background:var(--card);color:var(--text);border-color:#2b3242}
+    .tab.active{background:var(--card);color:var(--text);border-color:var(--btn-border);box-shadow:0 1px 2px rgba(0,0,0,.05)}
     main{padding:16px}
-    .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin:12px 0}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin:12px 0;box-shadow:0 1px 3px rgba(0,0,0,.06)}
     .row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
     .row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
     label{font-size:12px;color:var(--muted)}
-    input,select,textarea{width:100%;padding:10px;border-radius:10px;border:1px solid var(--line);background:#0c0f14;color:var(--text)}
-    input[type="month"],input[type="date"],input[type="time"]{color-scheme:dark}
-    button{padding:10px 14px;border-radius:10px;border:1px solid #2b3242;background:#1a2233;color:var(--text);cursor:pointer}
-    button.primary{background:#123026;border-color:#1b4d3d;color:#c9ffe6}
+    input,select,textarea{width:100%;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--input-bg);color:var(--text)}
+    input[type="month"],input[type="date"],input[type="time"]{color-scheme:light}
+    button{padding:10px 14px;border-radius:10px;border:1px solid var(--btn-border);background:var(--btn-bg);color:var(--text);cursor:pointer}
+    button.primary{background:var(--primary-bg);border-color:var(--primary-border);color:var(--primary-text)}
     button.ghost{background:transparent;border-color:var(--line);color:var(--muted)}
-    button.danger{background:#2a0d12;border-color:#5a1b21;color:#ffd7dc}
+    button.danger{background:var(--danger-bg);border-color:var(--danger-border);color:var(--danger-text)}
     table{width:100%;border-collapse:collapse}
     th,td{border-bottom:1px solid var(--line);padding:10px;text-align:left}
-    th{color:#aab2c4;font-weight:600}
+    th{color:var(--muted);font-weight:600}
     .right{text-align:right}
     .muted{color:var(--muted)}
     .flex{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
     .spacer{flex:1}
-    .badge{display:inline-block;padding:2px 8px;border-radius:999px;background:#1e2431;border:1px solid #2b3242;color:#c8d0e0;font-size:12px}
+    .badge{display:inline-block;padding:2px 8px;border-radius:999px;background:var(--btn-bg);border:1px solid var(--btn-border);color:var(--muted);font-size:12px}
     .hint{font-size:12px;color:var(--muted)}
     .hidden{display:none}
 
     /* ===== 履歴テーブルのモバイル最適化 ===== */
 #historyTable { table-layout: fixed; }           /* 幅計算を安定させる */
 #historyTable th, #historyTable td { word-break: keep-all; } /* 日本語の文字ごとの折返しを防ぐ */
+
+/* スマホ: 入力欄を縦並びにして重ならないように */
+@media (max-width: 600px){
+  .row{ grid-template-columns:1fr; gap:12px; }
+  .row3{ grid-template-columns:1fr; gap:12px; }
+  .flex{ flex-direction:column; align-items:stretch; }
+  .flex button{ width:100%; }
+}
 
 @media (max-width: 480px){
   .wrap{ padding:12px; }
@@ -270,12 +296,14 @@
 
   <script>
     // ====== 1) Supabase 初期化 ======
-    // config.jsから設定を読み込む（デプロイ前にconfig.jsを編集してください）
-    const SUPABASE_URL = window.SUPABASE_CONFIG?.url || '';
-    const SUPABASE_ANON_KEY = window.SUPABASE_CONFIG?.anonKey || '';
+    // config.jsから設定を読み込む（Netlifyでは環境変数からビルド時に生成）
+    const SUPABASE_URL = (window.SUPABASE_CONFIG?.url || '').trim();
+    const SUPABASE_ANON_KEY = (window.SUPABASE_CONFIG?.anonKey || '').trim();
     
-    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-      alert('設定エラー: config.jsにSupabaseのURLとAPIキーを設定してください。');
+    const isPlaceholder = (s) => !s || s.includes('YOUR_') || s === 'YOUR_SUPABASE_URL' || s === 'YOUR_SUPABASE_ANON_KEY';
+    if (isPlaceholder(SUPABASE_URL) || isPlaceholder(SUPABASE_ANON_KEY)) {
+      console.error('Supabase設定が未設定です。Netlifyの場合は環境変数 SUPABASE_URL, SUPABASE_ANON_KEY を設定してください。');
+      alert('設定エラー: SupabaseのURLとAPIキーが設定されていません。Netlifyの「Environment variables」で SUPABASE_URL と SUPABASE_ANON_KEY を設定し、再デプロイしてください。');
     }
     
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -323,11 +351,23 @@
 
     document.getElementById('sendLink').addEventListener('click', async()=>{
       const email = document.getElementById('email').value.trim();
+      const statusEl = document.getElementById('loginStatus');
       if(!email){ alert('メールアドレスを入力してください'); return; }
-      document.getElementById('loginStatus').textContent = '送信中…';
-      // const { error } = await supabase.auth.signInWithOtp({ email, options: { emailRedirectTo: REDIRECT_TO } });
-      const { error } = await supabase.auth.signInWithOtp({ email });
-      document.getElementById('loginStatus').textContent = error ? ('送信失敗: '+ error.message) : '送信しました！メールのリンクを開いてください';
+      if (isPlaceholder(SUPABASE_URL) || isPlaceholder(SUPABASE_ANON_KEY)) {
+        statusEl.textContent = '設定エラー: 環境変数を設定して再デプロイしてください。';
+        return;
+      }
+      statusEl.textContent = '送信中…';
+      try {
+        const { error } = await supabase.auth.signInWithOtp({
+          email,
+          options: { emailRedirectTo: REDIRECT_TO }
+        });
+        statusEl.textContent = error ? ('送信失敗: ' + error.message) : '送信しました！メールのリンクを開いてください';
+      } catch (err) {
+        console.error(err);
+        statusEl.textContent = 'エラー: ' + (err.message || String(err));
+      }
     });
 
     signOutBtn.addEventListener('click', async()=>{
