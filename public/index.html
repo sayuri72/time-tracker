@@ -68,6 +68,7 @@
 
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.47.6/dist/umd/supabase.min.js"></script>
+  <script src="config.js"></script>
 </head>
 <body>
   <header>
@@ -269,8 +270,14 @@
 
   <script>
     // ====== 1) Supabase 初期化 ======
-    const SUPABASE_URL = 'https://jsybriyheohiztlilihy.supabase.co'; // 例: https://xxxx.supabase.co
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpzeWJyaXloZW9oaXp0bGlsaWh5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk3NjYwMDAsImV4cCI6MjA3NTM0MjAwMH0.6-lHXtoSAbihIOix1ORHUeIpptF6bVmvne1DP94dZmU';
+    // config.jsから設定を読み込む（デプロイ前にconfig.jsを編集してください）
+    const SUPABASE_URL = window.SUPABASE_CONFIG?.url || '';
+    const SUPABASE_ANON_KEY = window.SUPABASE_CONFIG?.anonKey || '';
+    
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+      alert('設定エラー: config.jsにSupabaseのURLとAPIキーを設定してください。');
+    }
+    
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       auth: {
         persistSession: true,
@@ -279,8 +286,8 @@
       },
     });
 
-    // Magic Link の固定リダイレクト先（本番のNetlify URLに置き換え）
-    const REDIRECT_TO = 'https://soft-jalebi-751393.netlify.app/';
+    // Magic Link のリダイレクト先（現在のページのURLを使用）
+    const REDIRECT_TO = window.location.origin + window.location.pathname;
 
     // === エラーハッシュの表示（原因をユーザーに見せる） ===
     (function(){

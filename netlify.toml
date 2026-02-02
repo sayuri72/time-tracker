@@ -1,3 +1,9 @@
 [build]
   publish = "public"
-  command = ""
+  command = "node build-config.js"
+
+# リダイレクト設定（SPA用）
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

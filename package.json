@@ -1,0 +1,15 @@
+{
+  "name": "time-tracker",
+  "version": "1.0.0",
+  "description": "タイムトラッカー（Supabase版）",
+  "scripts": {
+    "build": "node build-config.js",
+    "serve": "npx serve public"
+  },
+  "keywords": [
+    "time-tracker",
+    "supabase"
+  ],
+  "author": "",
+  "license": "MIT"
+}
